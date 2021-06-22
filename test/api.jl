@@ -79,3 +79,107 @@ pmat = [0 2 0;
         1 0 2]
 @test all(smat .== substoichmat(rnmat))
 @test all(pmat .== prodstoichmat(rnmat))
+
+## testing newly added intermediate complexes reaction networks
+rn  = Vector{ReactionSystem}(undef,6)
+# mass-action non-catalytic
+rn[1] = @reaction_network begin
+    k₁, 2A --> B
+    k₂, A --> C
+    k₃, C --> D
+    k₄, B + D --> E
+end k₁ k₂ k₃ k₄
+Z = [2 0 1 0 0 0 0; 0 1 0 0 0 1 0; 0 0 0 1 0 0 0; 0 0 0 0 1 1 0; 0 0 0 0 0 0 1]
+B = [-1 0 0 0; 1 0 0 0; 0 -1 0 0; 0 1 -1 0; 0 0 1 0; 0 0 0 -1; 0 0 0 1]
+Δ = [-1 0 0 0; 0 0 0 0; 0 -1 0 0; 0 0 -1 0; 0 0 0 0; 0 0 0 -1; 0 0 0 0]
+@test all(Z .== complex_stoich_matrix(rn[1]))
+@test all(B .== complex_incidence_matrix(rn[1]))
+@test all(Δ .== complex_outgoing_matrix(rn[1]))
+@test all(Z*B .== netstoichmat(rn[1])')
+
+# mass-action rober
+rn[2] = @reaction_network begin
+    k₁, A --> B
+    k₂, B + B --> C + B
+    k₃, B + C --> A + C
+end k₁ k₂ k₃
+Z = [1 0 0 0 1; 0 1 2 1 0; 0 0 0 1 1]
+B = [-1 0 0; 1 0 0; 0 -1 0; 0 1 -1; 0 0 1]
+Δ = [-1 0 0; 0 0 0; 0 -1 0; 0 0 -1; 0 0 0]
+@test all(Z .== complex_stoich_matrix(rn[2]))
+@test all(B .== complex_incidence_matrix(rn[2]))
+@test all(Δ .== complex_outgoing_matrix(rn[2]))
+@test all(Z*B .== netstoichmat(rn[2])')
+
+
+#  some rational functions as rates
+rn[3] = @reaction_network begin
+    k₁ , ∅ --> X₁
+    ( k₂/(1 + X₁*X₂ + X₃*X₄ ), k₃/(1 + X₁*X₂ + X₃*X₄ )), 2X₁ + X₂ ↔ 3X₃ + X₄
+    k₄, X₄ --> ∅
+end k₁ k₂ k₃ k₄
+Z = [0 1 2 0 0; 0 0 1 0 0; 0 0 0 3 0; 0 0 0 1 1]
+B = [-1 0 0 1; 1 0 0 0; 0 -1 1 0; 0 1 -1 0; 0 0 0 -1]
+Δ = [-1 0 0 0; 0 0 0 0; 0 -1 0 0; 0 0 -1 0; 0 0 0 -1]
+@test all(Z .== complex_stoich_matrix(rn[3]))
+@test all(B .== complex_incidence_matrix(rn[3]))
+@test all(Δ .== complex_outgoing_matrix(rn[3]))
+@test all(Z*B .== netstoichmat(rn[3])')
+
+# repressilator
+rn[4]  = @reaction_network begin
+   hillR(P₃,α,K,n), ∅ --> m₁
+   hillR(P₁,α,K,n), ∅ --> m₂
+   hillR(P₂,α,K,n), ∅ --> m₃
+   (δ,γ), m₁ ↔ ∅
+   (δ,γ), m₂ ↔ ∅
+   (δ,γ), m₃ ↔ ∅
+   β, m₁ --> m₁ + P₁
+   β, m₂ --> m₂ + P₂
+   β, m₃ --> m₃ + P₃
+   μ, P₁ --> ∅
+   μ, P₂ --> ∅
+   μ, P₃ --> ∅
+end α K n δ γ β μ;
+Z = [0 1 0 0 1 0 0 0 0 0; 0 0 1 0 0 1 0 0 0 0; 0 0 0 1 0 0 1 0 0 0; 0 0 0 0 1 0 0 1 0 0; 0 0 0 0 0 1 0 0 1 0; 0 0 0 0 0 0 1 0 0 1]
+B = [-1 -1 -1 1 -1 1 -1 1 -1 0 0 0 1 1 1; 1 0 0 -1 1 0 0 0 0 -1 0 0 0 0 0; 0 1 0 0 0 -1 1 0 0 0 -1 0 0 0 0; 
+       0 0 1 0 0 0 0 -1 1 0 0 -1 0 0 0; 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0; 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0; 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0;
+       0 0 0 0 0 0 0 0 0 0 0 0 -1 0 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 -1 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1]
+Δ = [-1 -1 -1 0 -1 0 -1 0 -1 0 0 0 0 0 0; 0 0 0 -1 0 0 0 0 0 -1 0 0 0 0 0; 0 0 0 0 0 -1 0 0 0 0 -1 0 0 0 0; 
+       0 0 0 0 0 0 0 -1 0 0 0 -1 0 0 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0; 
+       0 0 0 0 0 0 0 0 0 0 0 0 -1 0 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 -1 0; 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1]
+
+@test all(Z .== complex_stoich_matrix(rn[4]))
+@test all(B .== complex_incidence_matrix(rn[4]))
+@test all(Δ .== complex_outgoing_matrix(rn[4]))
+@test all(Z*B .== netstoichmat(rn[4])')
+
+#brusselator
+rn[5] = @reaction_network begin
+   A, ∅ → X
+   1, 2X + Y → 3X
+   B, X → Y
+   1, X → ∅
+end A B
+Z = [0 1 2 3 0; 0 0 1 0 1]
+B = [-1 0 0 1; 1 0 -1 -1; 0 -1 0 0; 0 1 0 0; 0 0 1 0]
+Δ = [-1 0 0 0; 0 0 -1 -1; 0 -1 0 0; 0 0 0 0; 0 0 0 0]
+@test all(Z .== complex_stoich_matrix(rn[5]))
+@test all(B .== complex_incidence_matrix(rn[5]))
+@test all(Δ .== complex_outgoing_matrix(rn[5]))
+@test all(Z*B .== netstoichmat(rn[5])')
+
+
+# some rational functions as rates
+rn[6] = @reaction_network begin
+    (k₁, k₋₁), X₁ + X₂ <--> X₃ + 2X₄
+    (k₂/(1 + X₄*X₅ + X₆*X₇), k₋₂/(1 + X₄*X₅ + X₆*X₇)), 3X₄ + X₅ <--> X₆ + X₇
+    (k₃/(1 + X₇ + X₈ + X₉ + X₁₀) , k₋₃/(1 + X₇ + X₈ + X₉ + X₁₀ )), 5X₇ + X₈ <--> X₉ + X₁₀
+end k₁ k₋₁ k₂ k₋₂ k₃ k₋₃
+Z = [1 0 0 0 0 0; 1 0 0 0 0 0; 0 1 0 0 0 0; 0 2 3 0 0 0; 0 0 1 0 0 0; 0 0 0 1 0 0; 0 0 0 1 5 0; 0 0 0 0 1 0; 0 0 0 0 0 1; 0 0 0 0 0 1]
+B = [-1 1 0 0 0 0; 1 -1 0 0 0 0; 0 0 -1 1 0 0; 0 0 1 -1 0 0; 0 0 0 0 -1 1; 0 0 0 0 1 -1]
+Δ = [-1 0 0 0 0 0; 0 -1 0 0 0 0; 0 0 -1 0 0 0; 0 0 0 -1 0 0; 0 0 0 0 -1 0; 0 0 0 0 0 -1]
+@test all(Z .== complex_stoich_matrix(rn[6]))
+@test all(B .== complex_incidence_matrix(rn[6]))
+@test all(Δ .== complex_outgoing_matrix(rn[6]))
+@test all(Z*B .== netstoichmat(rn[6])')

@@ -43,6 +43,7 @@ include("networkapi.jl")
 export species, params, reactions, speciesmap, paramsmap, numspecies, numreactions, numparams
 export make_empty_network, addspecies!, addparam!, addreaction!
 export dependants, dependents, substoichmat, prodstoichmat, netstoichmat
+export reaction_complexes, reaction_rates, complex_stoich_matrix, complex_incidence_matrix, complex_outgoing_matrix
 export conservationlaws, conservedquantities
 
 # for Latex printing of ReactionSystems

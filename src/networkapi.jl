@@ -183,6 +183,122 @@ function netstoichmat(rn; smap=speciesmap(rn))
 end
 
 
+"""
+Function reaction_complexes(rn)
+Returns complexes of reaction network as 
+`complexes` and, `complexes_mat` , both are useful representations
+"""
+function reaction_complexes(rn)
+    complexes_mat = [];         complexes = [];
+    r = reactions(rn);
+    for i in 1:numreactions(rn)
+        push!(complexes_mat, [r[i].substrates r[i].substoich])
+        push!(complexes_mat, [r[i].products r[i].prodstoich])
+        if r[i].substrates == Any[]
+            push!(complexes, 0)
+            push!(complexes, sum(r[i].products.*r[i].prodstoich))
+        elseif r[i].products == Any[]
+            push!(complexes, sum(r[i].substrates.*r[i].substoich))
+            push!(complexes, 0)
+        else
+            push!(complexes, sum(r[i].substrates.*r[i].substoich))
+            push!(complexes, sum(r[i].products.*r[i].prodstoich))
+        end
+    end
+    return [complexes_mat[unique(i -> complexes[i] , eachindex(complexes))] unique(complexes)]
+end
+
+"""
+Returns rates of reactions
+"""
+function reaction_rates(rn)
+    kd = [];
+    r  =reactions(rn)
+    for i in 1:numreactions(rn)
+        push!(kd, r[i].rate)
+    end
+    return kd
+end
+
+"""
+complex_stoich_matrix(rn; cmp_mat = reaction_complexes(rn)[:,1],smap = speciesmap(rn))
+Returns a complex stooichiometric matrix..all entries are non-negative
+
+"""
+function complex_stoich_matrix(rn; cmp_mat = reaction_complexes(rn)[:,1],
+                                                smap = speciesmap(rn))
+    Z = zeros(Int, numspecies(rn), length(cmp_mat));
+    for i in 1:length(cmp_mat)
+        for j in 1:length(cmp_mat[i][:,1])
+            Z[smap[cmp_mat[i][:,1][j]] ,i] = cmp_mat[i][:,2][j]
+        end
+    end
+    return Z
+end
+
+"""
+complex_incidence_matrix(rn; cmp_mat = reaction_complexes(rn)[:,2])
+Returns a complex incidence matrix.. defined as,
+Bᵢⱼ = -1, if the ith complex is the substrate of the jth reaction,
+    =  1, if the ith complex is the product of the jth reaction,
+    =  0, otherwise
+
+"""
+function complex_incidence_matrix(rn; cmp_mat = reaction_complexes(rn)[:,2])
+    r = reactions(rn);
+    B = zeros(Int, length(cmp_mat), numreactions(rn));
+    for i in 1:numreactions(rn)
+        if r[i].substrates == Any[] && r[i].products != Any[]
+            sub_index = findall(x -> isequal(x ,0) ,cmp_mat)[1]
+
+            prod_index = findall(x -> isequal(x, sum(r[i].products.*r[i].prodstoich))
+                                                ,cmp_mat)[1]
+
+        elseif r[i].substrates != Any[] && r[i].products == Any[]
+            sub_index = findall(x -> isequal(x, sum(r[i].substrates.*r[i].substoich))
+                                                ,cmp_mat)[1]
+            prod_index = findall(x -> isequal(x ,0) ,cmp_mat)[1]
+
+        elseif (r[i].substrates != Any[] && r[i].products != Any[])
+            sub_index = findall(x -> isequal(x, sum(r[i].substrates.*r[i].substoich))
+                                                ,cmp_mat)[1]
+
+            prod_index = findall(x -> isequal(x, sum(r[i].products.*r[i].prodstoich))
+                                                ,cmp_mat)[1]
+        end
+        B[sub_index, i] = -1;
+        B[prod_index, i] = 1;
+    end
+    return B
+end
+
+"""
+complex_outgoing_matrix(rn; cmp_mat = reaction_complexes(rn)[:,2])
+Returns a complex_outgoing_matri defined as,
+Δᵢⱼ = 0    , if Bᵢⱼ = 1
+    = Bᵢⱼ  , otherwise
+"""
+function complex_outgoing_matrix(rn, cmp_mat = reaction_complexes(rn)[:,2])
+    r = reactions(rn);
+    Δ = zeros(Int, length(cmp_mat), numreactions(rn));
+    for i in 1:numreactions(rn)
+        if r[i].substrates == Any[]
+            sub_index = findall(x -> isequal(x ,0) ,cmp_mat)[1]
+        else
+            sub_index = findall(x -> isequal(x, sum(r[i].substrates.*r[i].substoich))
+                                                ,cmp_mat)[1]
+        end
+        Δ[sub_index, i] = -1;
+    end
+    return Δ
+end
+"""
+We can define a laplacian matrix from these returned arrays from complexstoichmat as,
+KD = diagm((map(Num, kd)))
+L = B*KD*Δ', and rewrite the ODESystem as x' = -Z*L*exp.(Z'*log.(states(rn)))
+and/or also check that, netstoichmat(rn) == Z*B 
+"""
+
 ######################## conservation laws ###############################
 
 """ 
